@@ -86,7 +86,7 @@ def chat_ui():
     st.title("💬 Ganesh ChatBot (Streamlit)")
     st.caption("Your local browser chat using Google AI Studio key")
 
-    # sidebar settings
+    # ---- sidebar settings
     with st.sidebar:
         st.header("Settings")
         model = st.selectbox(
@@ -95,21 +95,31 @@ def chat_ui():
             index=0,
             help="These names work with your current SDK (v1beta)."
         )
+
+        st.divider()
+        st.subheader("Voice output")
+        speak_enabled = st.toggle("🔊 Speak assistant replies", value=True)
+        tts_lang = st.selectbox("Language", ["en", "es", "fr", "de", "hi", "te", "ta", "zh-cn"], index=0)
+        tts_accent = st.selectbox("Accent (tld)", ["com", "co.uk", "com.au", "co.in"], index=0)
+        tts_slow = st.toggle("Slow speed", value=False)
+
         if st.button("Clear chat"):
             st.session_state.history = []
+            # also clear last audio
+            st.session_state.pop("last_tts_audio", None)
 
-    # keep chat history in session
+    # ---- keep chat history in session
     if "history" not in st.session_state:
         st.session_state.history = []
 
-    # render history
+    # ---- render history
     for turn in st.session_state.history:
         role = turn["role"]
         text = turn["parts"][0].get("text", "")
         with st.chat_message("assistant" if role == "model" else "user"):
             st.markdown(text)
 
-    # input bar
+    # ---- input bar
     prompt = st.chat_input("Type your message…")
 
     if prompt:
@@ -129,8 +139,33 @@ def chat_ui():
                     answer = (resp.text or "").strip()
                 except Exception as e:
                     answer = f"Sorry, request failed: {e}"
+
+                # show text answer
                 st.markdown(answer)
+
+                # optional: speak the answer
+                if speak_enabled and answer:
+                    try:
+                        tts = gTTS(text=answer, lang=tts_lang, slow=tts_slow, tld=tts_accent)
+                        buf = io.BytesIO()
+                        tts.write_to_fp(buf)
+                        buf.seek(0)
+                        # keep a reference so the audio doesn't disappear on rerun
+                        st.session_state.last_tts_audio = buf.getvalue()
+
+                        st.audio(st.session_state.last_tts_audio, format="audio/mp3")
+                        ts = int(time.time())
+                        st.download_button(
+                            label="Download reply as MP3",
+                            data=st.session_state.last_tts_audio,
+                            file_name=f"reply_{tts_lang}_{ts}.mp3",
+                            mime="audio/mpeg"
+                        )
+                    except Exception as e:
+                        st.warning(f"Could not synthesize speech: {e}")
+
         st.session_state.history.append({"role": "model", "parts": [{"text": answer}]})
+
 
 # ----------------- Simple nav -----------------
 mode = st.sidebar.radio("Navigate", ["Chat", "Text to Speech"], index=0)
