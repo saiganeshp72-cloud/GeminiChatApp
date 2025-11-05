@@ -5,6 +5,7 @@ from google import genai
 
 HERE = pathlib.Path(__file__).resolve().parent
 
+# hi 
 # Force override so .env wins over any pre-set OS variable
 load_dotenv(dotenv_path=HERE / ".env", override=True)
 
